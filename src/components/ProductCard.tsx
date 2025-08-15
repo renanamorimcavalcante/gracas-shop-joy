@@ -5,7 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
   price: number;
   image: string;
@@ -14,7 +14,7 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  onAddToCart: (productId: number, quantity: number) => void;
+  onAddToCart: (productId: string, quantity: number) => void;
 }
 
 const ProductCard = ({ product, onAddToCart }: ProductCardProps) => {

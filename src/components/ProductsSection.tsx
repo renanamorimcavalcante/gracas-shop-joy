@@ -1,70 +1,117 @@
 import ProductCard from "./ProductCard";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import productMug from "@/assets/product-mug.jpg";
 import productJewelry from "@/assets/product-jewelry.jpg";
 import productSoap from "@/assets/product-soap.jpg";
 
-const products = [
-  {
-    id: 1,
-    name: "Caneca Artesanal Brasileira",
-    price: 45.90,
-    image: productMug,
-    description: "Linda caneca de cerâmica com padrões brasileiros tradicionais"
-  },
-  {
-    id: 2,
-    name: "Colar com Pedras Naturais",
-    price: 89.90,
-    image: productJewelry,
-    description: "Colar artesanal com pedras naturais brasileiras"
-  },
-  {
-    id: 3,
-    name: "Sabonetes Naturais Kit",
-    price: 32.90,
-    image: productSoap,
-    description: "Kit com 3 sabonetes artesanais com ingredientes naturais"
-  },
-  {
-    id: 4,
-    name: "Caneca Premium",
-    price: 65.90,
-    image: productMug,
-    description: "Versão premium da nossa caneca mais vendida"
-  },
-  {
-    id: 5,
-    name: "Conjunto de Joias",
-    price: 159.90,
-    image: productJewelry,
-    description: "Conjunto completo: colar, brincos e pulseira"
-  },
-  {
-    id: 6,
-    name: "Sabonetes Premium",
-    price: 54.90,
-    image: productSoap,
-    description: "Kit premium com 5 sabonetes de ingredientes especiais"
-  }
-];
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+  description: string;
+  stock_quantity: number;
+}
+
+const imageMap: { [key: string]: string } = {
+  '/src/assets/product-mug.jpg': productMug,
+  '/src/assets/product-jewelry.jpg': productJewelry,
+  '/src/assets/product-soap.jpg': productSoap,
+};
 
 const ProductsSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastAddedProduct, setLastAddedProduct] = useState<string>("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const handleAddToCart = (productId: number, quantity: number) => {
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os produtos.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToCart = async (productId: string, quantity: number) => {
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Faça login para adicionar produtos ao carrinho.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const product = products.find(p => p.id === productId);
-    if (product) {
+    if (!product) return;
+
+    try {
+      // Verificar se já existe no carrinho
+      const { data: existingItem } = await supabase
+        .from('cart_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('product_id', productId)
+        .single();
+
+      if (existingItem) {
+        // Atualizar quantidade
+        const { error } = await supabase
+          .from('cart_items')
+          .update({ quantity: existingItem.quantity + quantity })
+          .eq('id', existingItem.id);
+
+        if (error) throw error;
+      } else {
+        // Adicionar novo item
+        const { error } = await supabase
+          .from('cart_items')
+          .insert({
+            user_id: user.id,
+            product_id: productId,
+            quantity
+          });
+
+        if (error) throw error;
+      }
+
       setLastAddedProduct(product.name);
       setIsModalOpen(true);
       toast({
         title: "Produto adicionado!",
         description: `${quantity}x ${product.name} foi adicionado ao carrinho.`,
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar ao carrinho:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar o produto ao carrinho.",
+        variant: "destructive"
       });
     }
   };
@@ -95,15 +142,33 @@ const ProductsSection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onAddToCart={handleAddToCart}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-card rounded-lg p-4 animate-pulse">
+                <div className="bg-muted h-48 rounded-lg mb-4"></div>
+                <div className="bg-muted h-4 rounded mb-2"></div>
+                <div className="bg-muted h-4 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  image: imageMap[product.image_url] || productMug,
+                  description: product.description
+                }}
+                onAddToCart={handleAddToCart}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal de Confirmação */}
