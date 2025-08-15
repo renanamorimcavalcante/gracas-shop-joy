@@ -1,12 +1,16 @@
-import { useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
-import { Link } from "react-router-dom";
+"use client"
+
+import { useState } from "react"
+import { Menu, X, ShoppingCart, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/hooks/useAuth"
+import { useCart } from "@/hooks/useCart"
+import { Link } from "react-router-dom"
 
 const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { user, signOut } = useAuth()
+  const { totalItems } = useCart()
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-soft">
@@ -36,13 +40,19 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" className="relative">
-            <ShoppingCart className="h-5 w-5" />
-            <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              0
-            </span>
-          </Button>
-          
+          {/* Cart Button */}
+          <Link to="/cart">
+            <Button variant="ghost" size="icon" className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {totalItems}
+                </span>
+              )}
+            </Button>
+          </Link>
+
+          {/* User Info */}
           {user ? (
             <div className="hidden md:flex items-center space-x-2">
               <span className="text-sm text-foreground">Olá, {user.email}</span>
@@ -59,13 +69,9 @@ const Header = () => {
               </Link>
             </div>
           )}
-          
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
+
+          {/* Mobile Menu Toggle */}
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
@@ -87,18 +93,19 @@ const Header = () => {
             <a href="#contato" className="text-foreground hover:text-primary transition-colors">
               Contato
             </a>
-            
+
+            {/* User Actions */}
             {user ? (
               <div className="flex flex-col space-y-2 pt-4 border-t">
                 <span className="text-sm text-foreground">Olá, {user.email}</span>
-                <Button variant="outline" size="sm" onClick={signOut} className="w-fit">
+                <Button variant="outline" size="sm" onClick={signOut} className="w-fit bg-transparent">
                   Sair
                 </Button>
               </div>
             ) : (
               <div className="pt-4 border-t">
                 <Link to="/auth">
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
                     Entrar
                   </Button>
                 </Link>
@@ -108,7 +115,7 @@ const Header = () => {
         </div>
       )}
     </header>
-  );
-};
+  )
+}
 
-export default Header;
+export default Header
